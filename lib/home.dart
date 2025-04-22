@@ -78,7 +78,7 @@ class _HomePageState extends State<HomePage> {
             decoration: BoxDecoration(
               color: const Color.fromARGB(102, 1, 81, 143),
             ),
-            child: CustomScrollView(
+            child:  CustomScrollView(
               slivers: <Widget>[
                 SliverAppBar(title: _searchBar(), pinned: true),
 
