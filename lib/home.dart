@@ -1,7 +1,10 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import './services/request_services.dart';
 import './models/weather.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:http/http.dart' as http;
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -11,19 +14,46 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  String selectedCity = "New Delhi";
+  String selectedCity = "";
   Weather? list;
   bool isLoaded = false;
   double lat = 0;
   double long = 0;
   String hinted = "Search for the location";
 
+  final TextEditingController _searchController =
+      TextEditingController(); // To read input
+  List<dynamic> _suggestions = []; // To store suggestions from API
+
+  Future<void> _fetchSuggestions(String query) async {
+    if (query.isEmpty) {
+      setState(() {
+        _suggestions = [];
+      });
+      return;
+    }
+
+    final url = Uri.parse(
+      'https://api.weatherapi.com/v1/search.json?key=0e85ff7496b64fe08df84436251804&q=$query',
+    );
+
+    try {
+      final res = await http.get(url);
+      if (res.statusCode == 200) {
+        setState(() {
+          _suggestions = jsonDecode(res.body);
+        });
+      }
+    } catch (e) {
+      print('Error fetching suggestions: $e');
+    }
+  }
+
   Future _getLocation() async {
     Position position = await Geolocator.getCurrentPosition();
     setState(() {
       lat = position.latitude;
       long = position.longitude;
-      hinted = "Search for the location";
     });
     getData();
   }
@@ -31,6 +61,7 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
+    _getLocation();
 
     getData();
   }
@@ -43,13 +74,11 @@ class _HomePageState extends State<HomePage> {
       });
     } else {
       setState(() {
-        selectedCity = "London";
+        selectedCity = "";
         getData();
       });
     }
   }
-
-  
 
   double get currTemp {
     return list?.current.tempC ?? 0;
@@ -73,52 +102,61 @@ class _HomePageState extends State<HomePage> {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       home: Scaffold(
-        body: SafeArea(
-          child: Container(
-            decoration: BoxDecoration(
-              color: const Color.fromARGB(102, 1, 81, 143),
-            ),
-            child:  CustomScrollView(
-              slivers: <Widget>[
-                SliverAppBar(title: _searchBar(), pinned: true),
-
-                SliverAppBar(
-                  pinned: true,
-                  expandedHeight: MediaQuery.of(context).size.height / 2,
-
-                  backgroundColor: Colors.transparent,
-                  flexibleSpace: LayoutBuilder(
-                    builder: (context, constraints) {
-                      final isCollapsed =
-                          constraints.maxHeight <= kToolbarHeight + 20;
-
-                      return FlexibleSpaceBar(
-                        centerTitle: true,
-
-                        background:
-                            isCollapsed == true
-                                ? _weatherCardCompact() // 👈 compact version on scroll
-                                : _weatherCard(), // 👈 full version when expanded
-                        title:
-                            isCollapsed
-                                ? _weatherCardCompact() // optional, you can keep this empty since we use compact widget
-                                : null,
-                      );
-                    },
-                  ),
+        body: Stack(
+          children: [
+            SafeArea(
+              child: Container(
+                decoration: const BoxDecoration(
+                  color: Color.fromARGB(102, 1, 81, 143),
                 ),
-
-                SliverList(
-                  delegate: SliverChildBuilderDelegate((
-                    BuildContext context,
-                    int index,
-                  ) {
-                    return _infoCards();
-                  }, childCount: 1),
+                child: CustomScrollView(
+                  slivers: <Widget>[
+                    SliverAppBar(
+                      title: _searchBar(),
+                      pinned: true,
+                      backgroundColor: Colors.transparent,
+                    ),
+                    SliverAppBar(
+                      pinned: true,
+                      expandedHeight: MediaQuery.of(context).size.height / 2,
+                      backgroundColor: Colors.transparent,
+                      flexibleSpace: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final isCollapsed =
+                              constraints.maxHeight <= kToolbarHeight + 20;
+                          return FlexibleSpaceBar(
+                            centerTitle: true,
+                            background:
+                                isCollapsed
+                                    ? _weatherCardCompact()
+                                    : _weatherCard(),
+                            title: isCollapsed ? _weatherCardCompact() : null,
+                          );
+                        },
+                      ),
+                    ),
+                    SliverList(
+                      delegate: SliverChildBuilderDelegate((
+                        BuildContext context,
+                        int index,
+                      ) {
+                        return _infoCards();
+                      }, childCount: 1),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
-          ),
+
+            // 🟡 Suggestion overlay placed above entire app
+            if (_suggestions.isNotEmpty)
+              Positioned(
+                top: 70, // Adjust depending on height of your search bar
+                left: 16,
+                right: 16,
+                child: _suggestionOverlay(),
+              ),
+          ],
         ),
       ),
     );
@@ -148,6 +186,7 @@ class _HomePageState extends State<HomePage> {
 
   Widget _weatherCard() {
     return Container(
+      height: MediaQuery.of(context).size.height / 3,
       decoration: BoxDecoration(),
       child: Column(
         mainAxisSize: MainAxisSize.min, // 🟢 Keeps container height dynamic
@@ -173,18 +212,34 @@ class _HomePageState extends State<HomePage> {
                 : "Loading...",
             style: TextStyle(
               fontSize: list?.current.tempC != null ? 58 : 26,
+
               color: Colors.white,
               fontWeight: FontWeight.w100,
             ),
+            textAlign: TextAlign.right,
           ),
 
           list?.current.condition.icon != null
-              ? Image.network(
-                list?.current.condition.icon != null
-                    ? list!.current.condition.icon
-                    : "Loading...",
-                width: 80, // optional size
-                height: 80,
+              ? Container(
+                decoration: BoxDecoration(
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(
+                        0.2,
+                      ), // shadow color with opacity
+                      spreadRadius: 1, // how wide the shadow spreads
+                      blurRadius: 30, // how blurry the shadow is
+                      offset: Offset(0, 4), // X and Y offset from the widget
+                    ),
+                  ],
+                ),
+                child: Image.network(
+                  list?.current.condition.icon != null
+                      ? list!.current.condition.icon
+                      : "Loading...",
+                  width: 80, // optional size
+                  height: 80,
+                ),
               )
               : Text("Loading..."),
 
@@ -204,20 +259,19 @@ class _HomePageState extends State<HomePage> {
             children: [
               Text(
                 list?.forecast.forecastday[0].day.maxtempC != null
-                    ? "H:${list!.forecast.forecastday[0].day.maxtempC.toString().split(".")[0]}°"
+                    ? "High:${list!.forecast.forecastday[0].day.maxtempC.toString().split(".")[0]}°"
                     : "Loading...",
                 style: TextStyle(color: Colors.white),
               ),
               SizedBox(width: 8),
               Text(
                 list?.forecast.forecastday[0].day.mintempC != null
-                    ? "L:${list!.forecast.forecastday[0].day.mintempC.toString().split(".")[0]}°"
+                    ? "Low:${list!.forecast.forecastday[0].day.mintempC.toString().split(".")[0]}°"
                     : "Loading...",
                 style: TextStyle(color: Colors.white),
               ),
             ],
           ),
-          SizedBox(height: 75),
 
           // _infoCards(),
         ],
@@ -226,17 +280,23 @@ class _HomePageState extends State<HomePage> {
   }
 
   String _getDay(int num) {
-    switch(num){
-      
-      case 1: return "Mon";
-      case 2: return "Tue";
-      case 3: return "Wed";
-      case 4: return "Thu";
-      case 5: return "Fri";
-      case 6: return "Sat";
-      case 7: return "Sun";
-      default: return "";
-
+    switch (num) {
+      case 1:
+        return "Mon";
+      case 2:
+        return "Tue";
+      case 3:
+        return "Wed";
+      case 4:
+        return "Thu";
+      case 5:
+        return "Fri";
+      case 6:
+        return "Sat";
+      case 7:
+        return "Sun";
+      default:
+        return "";
     }
   }
 
@@ -253,7 +313,7 @@ class _HomePageState extends State<HomePage> {
               width: MediaQuery.of(context).size.width / 2.8,
               padding: EdgeInsets.all(8),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(20),
                 color: const Color.fromARGB(72, 50, 87, 117),
               ),
               child: Column(
@@ -291,7 +351,7 @@ class _HomePageState extends State<HomePage> {
               width: MediaQuery.of(context).size.width / 2.8,
               padding: EdgeInsets.all(8),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(20),
                 color: const Color.fromARGB(72, 50, 87, 117),
               ),
               child: Column(
@@ -339,7 +399,7 @@ class _HomePageState extends State<HomePage> {
           width: MediaQuery.of(context).size.width - 56,
           padding: EdgeInsets.all(8),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(20),
             color: const Color.fromARGB(72, 50, 87, 117),
           ),
           child: Column(
@@ -349,7 +409,6 @@ class _HomePageState extends State<HomePage> {
               Text(
                 "Hourly Forecast",
                 style: TextStyle(
-                  
                   fontSize: 12,
                   color: const Color.fromARGB(255, 93, 93, 93),
                   fontWeight: FontWeight.w400,
@@ -357,57 +416,104 @@ class _HomePageState extends State<HomePage> {
               ),
               SizedBox(height: 10),
               SingleChildScrollView(
-  scrollDirection: Axis.horizontal,
+                scrollDirection: Axis.horizontal,
 
-  
-  child: Row(
-  children: list?.forecast.forecastday[0].hour.map((x) {
-    final json = x.toJson();
-    final time = json['time'];
-    final tempC = json['temp_c'];
-    final icon = x.condition.icon;
+                child: Row(
+                  children:
+                      list?.forecast.forecastday[0].hour
+                          .where((x) {
+                            final time = x.toJson()['time'];
+                            final localTimeStr = list!.location.localtime;
+                            if (time == null || localTimeStr == null)
+                              return false;
 
-    return Container(
-      padding: const EdgeInsets.all(8),
-      margin: const EdgeInsets.symmetric(horizontal: 4),
-      decoration: BoxDecoration(
-        border: Border(
-          right: BorderSide(
-            color: const Color.fromARGB(255, 101, 101, 101),
-            width: 2,
-          ),
-        ),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            time != null && time.toString().length >= 13
-                ? time.toString().substring(11, 16) // to get HH:mm
-                : "Loading...",
-            style: TextStyle(color: Colors.white),
-          ),
-          icon != null
-              ? Image.network(
-                  'https:$icon',
-                  width: 30,
-                  height: 30,
-                )
-              : SizedBox(height: 30), // placeholder for missing image
-          Text(
-            tempC != null
-                ? '${tempC.toString().split(".")[0]}°'
-                : "Loading...",
-            style: TextStyle(color: Colors.white),
-          ),
-        ],
-      ),
-    );
-  }).toList() ?? [],
-)
+                            final forecastTime = DateTime.parse(time);
+                            final currentTime = DateTime.parse(localTimeStr);
 
-),
+                            return forecastTime.isAfter(currentTime) ||
+                                forecastTime.hour == currentTime.hour;
+                          })
+                          .map((x) {
+                            final json = x.toJson();
+                            final time = json['time'];
+                            final tempC = json['temp_c'];
+                            final icon = x.condition.icon;
+                            int now =int.parse(time.toString().substring(11, 13))!= int.parse(list!.location.localtime.substring(11,13))?
+                                int.parse(time.toString().substring(11, 13)) %
+                                12: 0;
+                            String ampm =
+                                int.parse(time.toString().substring(11, 13)) <
+                                        12
+                                    ? "am"
+                                    : "pm";
 
+                            return Container(
+                              padding: const EdgeInsets.all(8),
+                              margin: const EdgeInsets.symmetric(horizontal: 4),
+                              decoration: BoxDecoration(
+                                border: Border(
+                                  right: BorderSide(
+                                    color: const Color.fromARGB(
+                                      255,
+                                      101,
+                                      101,
+                                      101,
+                                    ),
+                                    width: 2,
+                                  ),
+                                ),
+                              ),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    time != null && time.toString().length >= 13
+                                        ? now!=0?now.toString() + ampm:"now"
+                                        : "Loading...",
+                                    style: TextStyle(color: Colors.white),
+                                  ),
+                                  icon != null
+                                      ? Container(
+                                        decoration: BoxDecoration(
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Colors.black.withOpacity(
+                                                0.2,
+                                              ), // shadow color with opacity
+                                              spreadRadius:
+                                                  1, // how wide the shadow spreads
+                                              blurRadius:
+                                                  30, // how blurry the shadow is
+                                              offset: Offset(
+                                                0,
+                                                4,
+                                              ), // X and Y offset from the widget
+                                            ),
+                                          ],
+                                        ),
+                                        child: Image.network(
+                                          'https:$icon',
+                                          width: 30,
+                                          height: 30,
+                                        ),
+                                      )
+                                      : SizedBox(
+                                        height: 30,
+                                      ), // placeholder for missing image
+                                  Text(
+                                    tempC != null
+                                        ? '${tempC.toString().split(".")[0]}°'
+                                        : "Loading...",
+                                    style: TextStyle(color: Colors.white),
+                                  ),
+                                ],
+                              ),
+                            );
+                          })
+                          .toList() ??
+                      [],
+                ),
+              ),
 
               SizedBox(height: 14),
             ],
@@ -421,7 +527,7 @@ class _HomePageState extends State<HomePage> {
           width: MediaQuery.of(context).size.width - 56,
           padding: EdgeInsets.all(8),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(20),
             color: const Color.fromARGB(72, 50, 87, 117),
           ),
           child: Column(
@@ -451,23 +557,20 @@ class _HomePageState extends State<HomePage> {
                       //     style: TextStyle(fontSize: 22,
                       //     color: Colors.white),
                       //     textAlign: TextAlign.left,
-                          
+
                       //   )),
-                       
                     ],
                   ),
-                  
+
                   Column(
                     children: [
-                    Text(
-                      list != null
-                          ? "${list!.forecast.forecastday[0].day.avgtempC
-                              .toString()
-                              .substring(0, 2)}°"
-                          : "Loading",
-                      style: TextStyle(fontSize: 22,color: Colors.white),
-                    )
-                    ]
+                      Text(
+                        list != null
+                            ? "${list!.forecast.forecastday[0].day.avgtempC.toString().substring(0, 2)}°"
+                            : "Loading",
+                        style: TextStyle(fontSize: 22, color: Colors.white),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -476,56 +579,119 @@ class _HomePageState extends State<HomePage> {
             ],
           ),
         ),
-       
+
         SizedBox(height: 24),
       ],
     );
   }
 
-  _searchBar() {
-    return Padding(
-      padding: const EdgeInsets.all(8.0),
-
+  Widget _suggestionOverlay() {
+    return Material(
+      color: Colors.transparent,
       child: Container(
-        width: double.infinity,
-
         decoration: BoxDecoration(
-          color: const Color.fromARGB(64, 0, 52, 76), // same as fillColor
-          borderRadius: BorderRadius.circular(10),
+          color: const Color.fromARGB(255, 30, 50, 70),
+          borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              spreadRadius: 2,
-              blurRadius: 10,
-              offset: Offset(0, 4), // Shadow position
+              color: Colors.black.withOpacity(0.15),
+              spreadRadius: 1,
+              blurRadius: 6,
+              offset: const Offset(0, 2),
             ),
           ],
         ),
-        child: TextField(
-          onSubmitted: (e) {
-            setState(() {
-              selectedCity = e;
-              lat = 0;
-              long = 0;
-            });
-            getData();
+        child: ListView.builder(
+          shrinkWrap: true,
+          itemCount: _suggestions.length,
+          itemBuilder: (context, index) {
+            final loc = _suggestions[index];
+            return ListTile(
+              title: Text(
+                '${loc['name']}, ${loc['region']}, ${loc['country']}',
+                style: const TextStyle(color: Colors.white),
+              ),
+              onTap: () {
+                setState(() {
+                  selectedCity = loc['name'];
+                  _searchController.text = loc['name'];
+                  _suggestions.clear();
+                  lat = 0;
+                  long = 0;
+                });
+                getData();
+              },
+            );
           },
+        ),
+      ),
+    );
+  }
 
-          decoration: InputDecoration(
-            hintText: hinted,
-            hintStyle: TextStyle(color: Colors.white54),
-            prefixIcon: InkWell(
-              child: Icon(Icons.pin_drop, size: 30),
-
-              onTap: _getLocation,
+  Widget _searchBar() {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color.fromARGB(91, 0, 52, 76),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: const Color.fromARGB(130, 0, 0, 0).withOpacity(0.1),
+            spreadRadius: 2,
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: TextField(
+        controller: _searchController,
+        onChanged: _fetchSuggestions,
+        onSubmitted: (e) {
+          setState(() {
+            selectedCity = e;
+            lat = 0;
+            long = 0;
+            _suggestions.clear();
+          });
+          getData();
+        },
+        style: const TextStyle(color: Colors.white),
+        decoration: InputDecoration(
+          hintText: hinted,
+          hintStyle: const TextStyle(color: Color.fromARGB(147, 1, 1, 1)),
+          prefixIcon: Container(
+            padding: const EdgeInsets.only(left: 8, right: 12),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                InkWell(
+                  onTap: () {
+                    _getLocation();
+                    _searchController.clear(); // Clear text
+                    setState(() {
+                      // Force rebuild to show hint
+                      _suggestions.clear();
+                    });
+                  },
+                  child: const Icon(
+                    Icons.pin_drop,
+                    size: 30,
+                    color: Color.fromARGB(90, 0, 0, 0),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Container(width: 1, height: 30, color: Colors.black26),
+              ],
             ),
-            border: OutlineInputBorder(
-              borderSide: BorderSide.none, // removes inner border
-              borderRadius: BorderRadius.circular(10),
-            ),
-            filled: true,
-            fillColor: Colors.transparent, // handled by container
-            contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          ),
+          border: OutlineInputBorder(
+            borderSide: BorderSide.none,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          filled: true,
+          fillColor: Colors.transparent,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 14,
           ),
         ),
       ),
