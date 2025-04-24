@@ -6,10 +6,10 @@ class RequestServices {
   
 
 
-  Future<Weather?> getReq(lat, long, selectedCity) async {
+  Future<Weather?> getReq(double lat,double long,String selectedCity) async {
     var client = http.Client();
-    var url=null;
-    if (lat == 0 && long == 0) {
+    Uri url;
+    if (selectedCity.isNotEmpty) {
        url = Uri.parse(
         "https://api.weatherapi.com/v1/forecast.json?key=0e85ff7496b64fe08df84436251804&q=$selectedCity&days=7&aqi=no&alerts=no"
       );

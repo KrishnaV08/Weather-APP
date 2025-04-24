@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:weather_app/home.dart';
+import 'package:weather_app/add.dart';
+
 
 
 void main() {
@@ -18,7 +20,12 @@ class _MainAppState extends State<MainApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: HomePage()
+      home: WeatherApp(),
+      routes: {
+        "" :(context) =>  WeatherApp(),
+        "/Cards" : (context) => HomePage(),
+
+      },
     );
 }
 }

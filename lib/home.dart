@@ -1,5 +1,4 @@
 import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import './services/request_services.dart';
 import './models/weather.dart';
@@ -21,9 +20,24 @@ class _HomePageState extends State<HomePage> {
   double long = 0;
   String hinted = "Search for the location";
 
-  final TextEditingController _searchController =
-      TextEditingController(); // To read input
-  List<dynamic> _suggestions = []; // To store suggestions from API
+  final TextEditingController _searchController = TextEditingController();
+  List<dynamic> _suggestions = [];
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    final args = ModalRoute.of(context)?.settings.arguments;
+    if (args != null && args is String) {
+      setState(() {
+        selectedCity = args;
+      });
+      getData(); // Only call getData here if city is provided
+    } else {
+      _getLocation(); // Fallback to current location
+    }
+    getData();
+  }
 
   Future<void> _fetchSuggestions(String query) async {
     if (query.isEmpty) {
@@ -50,51 +64,39 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future _getLocation() async {
-    Position position = await Geolocator.getCurrentPosition();
-    setState(() {
-      lat = position.latitude;
-      long = position.longitude;
-    });
-    getData();
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _getLocation();
-
-    getData();
+    try {
+      Position position = await Geolocator.getCurrentPosition();
+      setState(() {
+        lat = position.latitude;
+        long = position.longitude;
+      });
+      getData();
+    } catch (e) {
+      print('Error getting location: $e');
+    }
   }
 
   getData() async {
-    list = await RequestServices().getReq(lat, long, selectedCity);
+    if (selectedCity.isNotEmpty) {
+      list = await RequestServices().getReq(0, 0, selectedCity);
+    } else {
+      list = await RequestServices().getReq(lat, long, "");
+    }
+
     if (list != null) {
       setState(() {
         isLoaded = true;
       });
     } else {
-      setState(() {
-        selectedCity = "";
-        getData();
-      });
     }
   }
 
-  double get currTemp {
-    return list?.current.tempC ?? 0;
-  }
-
-  double get feelss {
-    return list?.current.feelslikeC ?? 0;
-  }
-
+  double get currTemp => list?.current.tempC ?? 0;
+  double get feelss => list?.current.feelslikeC ?? 0;
   String get feeling {
-    if (feelss - currTemp > 0) {
-      return "Feels warmer ";
-    } else if (currTemp - feelss > 0) {
-      return "Feels cooler ";
-    }
-    return "Feels similar ";
+    if (feelss - currTemp > 0) return "Feels warmer";
+    if (currTemp - feelss > 0) return "Feels cooler";
+    return "Feels similar";
   }
 
   @override
@@ -148,10 +150,10 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
 
-            // 🟡 Suggestion overlay placed above entire app
+            // 🟡 Suggestions Overlay
             if (_suggestions.isNotEmpty)
               Positioned(
-                top: 70, // Adjust depending on height of your search bar
+                top: 70,
                 left: 16,
                 right: 16,
                 child: _suggestionOverlay(),
@@ -169,13 +171,14 @@ class _HomePageState extends State<HomePage> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-                      Image.network(
-              'https:${list?.current.condition.icon ?? ""}',
-              width: 30,
-              height: 30,
-              errorBuilder: (context, error, stackTrace) => const SizedBox(width: 24, height: 24),
-            ),
-
+          Image.network(
+            'https:${list?.current.condition.icon ?? ""}',
+            width: 30,
+            height: 30,
+            errorBuilder:
+                (context, error, stackTrace) =>
+                    const SizedBox(width: 24, height: 24),
+          ),
 
           SizedBox(width: 8),
           Text(
@@ -479,7 +482,7 @@ class _HomePageState extends State<HomePage> {
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Text(
-                                    time != null 
+                                    time != null
                                         ? now != 0
                                             ? now.toString() + ampm
                                             : "now"
@@ -536,115 +539,104 @@ class _HomePageState extends State<HomePage> {
         SizedBox(height: 24),
 
         if (list?.forecast.forecastday.length == 7) ...[
-  for (int i = 1; i < 8; i++) ...[
-    _forecastCard((list!.forecast.forecastday[0].date.day + i) % 7),
-    SizedBox(height: 1),
-  ],
-] else
-  Center(child: Text("Loading Data...")),
+          for (int i = 1; i < 8; i++) ...[
+            _forecastCard((list!.forecast.forecastday[0].date.day + i) % 7),
+            SizedBox(height: 1),
+          ],
+        ] else
+          Center(child: Text("Loading Data...")),
 
-  
-        // _forecastCard((list!.forecast.forecastday[0].date.day+1)%7),
-        // SizedBox(height: 1),
-
-        // _forecastCard((list!.forecast.forecastday[0].date.day+2)%7),
-        // SizedBox(height: 1),
-
-        // _forecastCard((list!.forecast.forecastday[0].date.day+3)%7),
-        // SizedBox(height: 1),
-
-        // _forecastCard((list!.forecast.forecastday[0].date.day+4)%7),
-        // SizedBox(height: 1),
-
-        // _forecastCard((list!.forecast.forecastday[0].date.day+5)%7),
-        // SizedBox(height: 1),
-
-        // _forecastCard((list!.forecast.forecastday[0].date.day+6)%7),
-        // SizedBox(height: 1),
-
+       
         SizedBox(height: 24),
       ],
     );
   }
 
   Container _forecastCard(int i) {
-  return Container(
-    height: 55,
-    width: MediaQuery.of(context).size.width - 56,
-    padding: const EdgeInsets.symmetric(horizontal: 16),
-    margin: const EdgeInsets.symmetric(vertical: 4),
-    decoration: BoxDecoration(
-      borderRadius: BorderRadius.circular(20),
-      color: const Color.fromARGB(72, 50, 87, 117),
-    ),
-    child: Row(
-      children: [
-        // Day
-        SizedBox(
-          width: 45,
-          child: Text(
-            list?.forecast != null ? _getDay(i) : "Loading...",
-            style: const TextStyle(fontSize: 16, color: Colors.white),
-          ),
-        ),
-
-        const SizedBox(width: 8),
-
-        // Icon and Condition
-        Row(
-          children: [
-            Image.network(
-              'https:${list?.forecast.forecastday[i].day.condition.icon ?? ""}',
-              width: 24,
-              height: 24,
-              errorBuilder: (context, error, stackTrace) =>
-                  const SizedBox(width: 24, height: 24),
+    return Container(
+      height: 55,
+      width: MediaQuery.of(context).size.width - 56,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        color: const Color.fromARGB(72, 50, 87, 117),
+      ),
+      child: Row(
+        children: [
+          // Day
+          SizedBox(
+            width: 45,
+            child: Text(
+              list?.forecast != null ? _getDay(i) : "Loading...",
+              style: const TextStyle(fontSize: 16, color: Colors.white),
             ),
-            const SizedBox(width: 6),
-            SizedBox(
-              width: 120,
-              child: Text(
-                list?.forecast.forecastday[i].day.condition.text ?? "",
-                style: const TextStyle(fontSize: 14, color: Colors.white),
+          ),
 
+          const SizedBox(width: 8),
+
+          // Icon and Condition
+          Row(
+            children: [
+              Image.network(
+                'https:${list?.forecast.forecastday[i].day.condition.icon ?? ""}',
+                width: 24,
+                height: 24,
+                errorBuilder:
+                    (context, error, stackTrace) =>
+                        const SizedBox(width: 24, height: 24),
               ),
-            ),
-          ],
-        ),
-
-        const Spacer(),
-
-        // Min Temp
-        Text(
-          list != null
-              ? "${list!.forecast.forecastday[i].day.mintempC.round()}°"
-              : "Loading",
-          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color.fromARGB(83, 255, 255, 255)),
-        ),
-
-        // Sliding-looking separator line
-        Container(
-          width: 40,
-          height: 2,
-          margin: const EdgeInsets.symmetric(horizontal: 8),
-          decoration: BoxDecoration(
-            color: Colors.white70,
-            borderRadius: BorderRadius.circular(2),
+              const SizedBox(width: 6),
+              SizedBox(
+                width: 120,
+                child: Text(
+                  list?.forecast.forecastday[i].day.condition.text ?? "",
+                  style: const TextStyle(fontSize: 14, color: Colors.white),
+                ),
+              ),
+            ],
           ),
-        ),
 
-        // Max Temp
-        Text(
-          list != null
-              ? "${list!.forecast.forecastday[i].day.maxtempC.round()}°"
-              : "Loading",
-          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
-        ),
-      ],
-    ),
-  );
-}
+          const Spacer(),
 
+          // Min Temp
+          Text(
+            list != null
+                ? "${list!.forecast.forecastday[i].day.mintempC.round()}°"
+                : "Loading",
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Color.fromARGB(83, 255, 255, 255),
+            ),
+          ),
+
+          // Sliding-looking separator line
+          Container(
+            width: 20,
+            height: 2,
+            margin: const EdgeInsets.symmetric(horizontal: 8),
+            decoration: BoxDecoration(
+              color: Colors.white70,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+
+          // Max Temp
+          Text(
+            list != null
+                ? "${list!.forecast.forecastday[i].day.maxtempC.round()}°"
+                : "Loading",
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _suggestionOverlay() {
     return Material(
@@ -690,72 +682,22 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _searchBar() {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color.fromARGB(91, 0, 52, 76),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: const Color.fromARGB(130, 0, 0, 0).withOpacity(0.1),
-            spreadRadius: 2,
-            blurRadius: 10,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
-      child: TextField(
-        controller: _searchController,
-        onChanged: _fetchSuggestions,
-        onSubmitted: (e) {
-          setState(() {
-            selectedCity = e;
-            lat = 0;
-            long = 0;
-            _suggestions.clear();
-          });
-          getData();
-        },
-        style: const TextStyle(color: Colors.white),
-        decoration: InputDecoration(
-          hintText: hinted,
-          hintStyle: const TextStyle(color: Color.fromARGB(147, 1, 1, 1)),
-          prefixIcon: Container(
-            padding: const EdgeInsets.only(left: 8, right: 12),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                InkWell(
-                  onTap: () {
-                    _getLocation();
-                    _searchController.clear(); // Clear text
-                    setState(() {
-                      // Force rebuild to show hint
-                      _suggestions.clear();
-                    });
-                  },
-                  child: const Icon(
-                    Icons.pin_drop,
-                    size: 30,
-                    color: Color.fromARGB(90, 0, 0, 0),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Container(width: 1, height: 30, color: Colors.black26),
-              ],
-            ),
-          ),
-          border: OutlineInputBorder(
-            borderSide: BorderSide.none,
-            borderRadius: BorderRadius.circular(10),
-          ),
-          filled: true,
-          fillColor: Colors.transparent,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 14,
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.start,
+
+      children: [
+        InkWell(
+          onTap: () => {Navigator.pop(context)},
+    
+          child: const Icon(
+            Icons.list,
+            size: 30,
+            color: Color.fromARGB(90, 0, 0, 0),
           ),
         ),
-      ),
+    
+    
+      ],
     );
   }
 }
