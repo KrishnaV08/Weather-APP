@@ -169,11 +169,14 @@ class _HomePageState extends State<HomePage> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Image.network(
-            list?.current.condition.icon ?? "",
-            width: 30,
-            height: 30,
-          ),
+                      Image.network(
+              'https:${list?.current.condition.icon ?? ""}',
+              width: 30,
+              height: 30,
+              errorBuilder: (context, error, stackTrace) => const SizedBox(width: 24, height: 24),
+            ),
+
+
           SizedBox(width: 8),
           Text(
             "${list?.location.name ?? ''} | ${list?.current.tempC?.toStringAsFixed(0) ?? '--'}°C",
@@ -293,7 +296,7 @@ class _HomePageState extends State<HomePage> {
         return "Fri";
       case 6:
         return "Sat";
-      case 7:
+      case 0:
         return "Sun";
       default:
         return "";
@@ -430,17 +433,26 @@ class _HomePageState extends State<HomePage> {
                             final forecastTime = DateTime.parse(time);
                             final currentTime = DateTime.parse(localTimeStr);
 
-                            return forecastTime.isAfter(currentTime) ||
-                                forecastTime.hour == currentTime.hour;
+                            return forecastTime.isAfter(currentTime);
                           })
                           .map((x) {
                             final json = x.toJson();
                             final time = json['time'];
                             final tempC = json['temp_c'];
                             final icon = x.condition.icon;
-                            int now =int.parse(time.toString().substring(11, 13))!= int.parse(list!.location.localtime.substring(11,13))?
-                                int.parse(time.toString().substring(11, 13)) %
-                                12: 0;
+                            int now =
+                                int.parse(time.toString().substring(11, 13)) !=
+                                        int.parse(
+                                          list!.location.localtime.substring(
+                                            11,
+                                            13,
+                                          ),
+                                        )
+                                    ? int.parse(
+                                          time.toString().substring(11, 13),
+                                        ) %
+                                        12
+                                    : 0;
                             String ampm =
                                 int.parse(time.toString().substring(11, 13)) <
                                         12
@@ -467,8 +479,10 @@ class _HomePageState extends State<HomePage> {
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Text(
-                                    time != null && time.toString().length >= 13
-                                        ? now!=0?now.toString() + ampm:"now"
+                                    time != null 
+                                        ? now != 0
+                                            ? now.toString() + ampm
+                                            : "now"
                                         : "Loading...",
                                     style: TextStyle(color: Colors.white),
                                   ),
@@ -521,69 +535,116 @@ class _HomePageState extends State<HomePage> {
         ),
         SizedBox(height: 24),
 
-        Container(
-          height: 300,
+        if (list?.forecast.forecastday.length == 7) ...[
+  for (int i = 1; i < 8; i++) ...[
+    _forecastCard((list!.forecast.forecastday[0].date.day + i) % 7),
+    SizedBox(height: 1),
+  ],
+] else
+  Center(child: Text("Loading Data...")),
 
-          width: MediaQuery.of(context).size.width - 56,
-          padding: EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            color: const Color.fromARGB(72, 50, 87, 117),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.start,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                "Forecast",
-                style: TextStyle(
-                  fontSize: 12,
-                  color: const Color.fromARGB(255, 93, 93, 93),
-                  fontWeight: FontWeight.w400,
-                ),
-              ),
-              SizedBox(height: 10),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+  
+        // _forecastCard((list!.forecast.forecastday[0].date.day+1)%7),
+        // SizedBox(height: 1),
 
-                    children: [
-                      // for (int i = 1; i <7; i++)
-                      //   (Text(
-                      //     list?.forecast.forecastday[i].date.weekday != null
-                      //         ? _getDay(list!.forecast.forecastday[i].date.weekday)                       : "Loading",
-                      //     style: TextStyle(fontSize: 22,
-                      //     color: Colors.white),
-                      //     textAlign: TextAlign.left,
+        // _forecastCard((list!.forecast.forecastday[0].date.day+2)%7),
+        // SizedBox(height: 1),
 
-                      //   )),
-                    ],
-                  ),
+        // _forecastCard((list!.forecast.forecastday[0].date.day+3)%7),
+        // SizedBox(height: 1),
 
-                  Column(
-                    children: [
-                      Text(
-                        list != null
-                            ? "${list!.forecast.forecastday[0].day.avgtempC.toString().substring(0, 2)}°"
-                            : "Loading",
-                        style: TextStyle(fontSize: 22, color: Colors.white),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+        // _forecastCard((list!.forecast.forecastday[0].date.day+4)%7),
+        // SizedBox(height: 1),
 
-              SizedBox(height: 14),
-            ],
-          ),
-        ),
+        // _forecastCard((list!.forecast.forecastday[0].date.day+5)%7),
+        // SizedBox(height: 1),
+
+        // _forecastCard((list!.forecast.forecastday[0].date.day+6)%7),
+        // SizedBox(height: 1),
 
         SizedBox(height: 24),
       ],
     );
   }
+
+  Container _forecastCard(int i) {
+  return Container(
+    height: 55,
+    width: MediaQuery.of(context).size.width - 56,
+    padding: const EdgeInsets.symmetric(horizontal: 16),
+    margin: const EdgeInsets.symmetric(vertical: 4),
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(20),
+      color: const Color.fromARGB(72, 50, 87, 117),
+    ),
+    child: Row(
+      children: [
+        // Day
+        SizedBox(
+          width: 45,
+          child: Text(
+            list?.forecast != null ? _getDay(i) : "Loading...",
+            style: const TextStyle(fontSize: 16, color: Colors.white),
+          ),
+        ),
+
+        const SizedBox(width: 8),
+
+        // Icon and Condition
+        Row(
+          children: [
+            Image.network(
+              'https:${list?.forecast.forecastday[i].day.condition.icon ?? ""}',
+              width: 24,
+              height: 24,
+              errorBuilder: (context, error, stackTrace) =>
+                  const SizedBox(width: 24, height: 24),
+            ),
+            const SizedBox(width: 6),
+            SizedBox(
+              width: 120,
+              child: Text(
+                list?.forecast.forecastday[i].day.condition.text ?? "",
+                style: const TextStyle(fontSize: 14, color: Colors.white),
+
+              ),
+            ),
+          ],
+        ),
+
+        const Spacer(),
+
+        // Min Temp
+        Text(
+          list != null
+              ? "${list!.forecast.forecastday[i].day.mintempC.round()}°"
+              : "Loading",
+          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color.fromARGB(83, 255, 255, 255)),
+        ),
+
+        // Sliding-looking separator line
+        Container(
+          width: 40,
+          height: 2,
+          margin: const EdgeInsets.symmetric(horizontal: 8),
+          decoration: BoxDecoration(
+            color: Colors.white70,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+
+        // Max Temp
+        Text(
+          list != null
+              ? "${list!.forecast.forecastday[i].day.maxtempC.round()}°"
+              : "Loading",
+          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+        ),
+      ],
+    ),
+  );
+}
+
 
   Widget _suggestionOverlay() {
     return Material(
