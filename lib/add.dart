@@ -351,36 +351,39 @@ class _WeatherAppState extends State<WeatherApp> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Weather App'),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _searchBar(),
-            if (_suggestions.isNotEmpty)
-            Positioned(
-              left: 16,
-              right: 16,
-              top: 100,
-              child: _suggestionOverlay(),
-            ),
- // Sliding card for adding new location
-            const SizedBox(height: 20),
-            // Display the list of added locations or a message if no locations are added
-            addedLocations.isEmpty
-                ? Center(child: Text('No locations added'))
-                : Expanded(child: _addedLocationsList())
-                ,
-               
-// List of added locations
-          ],
+Widget build(BuildContext context) {
+  return Scaffold(
+    appBar: AppBar(
+      title: Text('Weather App'),
+    ),
+    body: Stack(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _searchBar(),
+              const SizedBox(height: 20),
+              if (_suggestions.isNotEmpty)
+          
+
+            _suggestionOverlay(),
+          
+
+              // Display list of added locations or a message
+              addedLocations.isEmpty
+                  ? Expanded(child: Center(child: Text('No locations added')))
+                  : Expanded(child: _addedLocationsList()),
+            ],
+          ),
         ),
-      ),
-    );
-  }
+
+        // Suggestion Overlay
+        
+      ],
+    ),
+  );
+}
+
 }
