@@ -286,7 +286,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   String _getDay(int num) {
-    switch (num) {
+    switch (num%7) {
       case 1:
         return "Mon";
       case 2:
@@ -552,6 +552,9 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+      int datess=DateTime.now().weekday +1 ;
+
+
   Container _forecastCard(int i) {
     return Container(
       height: 55,
@@ -568,7 +571,7 @@ class _HomePageState extends State<HomePage> {
           SizedBox(
             width: 45,
             child: Text(
-              list?.forecast != null ? _getDay(i) : "Loading...",
+              list?.forecast != null ? _getDay(datess++) : "Loading...",
               style: const TextStyle(fontSize: 16, color: Colors.white),
             ),
           ),
