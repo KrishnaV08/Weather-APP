@@ -39,29 +39,6 @@ class _HomePageState extends State<HomePage> {
     getData();
   }
 
-  Future<void> _fetchSuggestions(String query) async {
-    if (query.isEmpty) {
-      setState(() {
-        _suggestions = [];
-      });
-      return;
-    }
-
-    final url = Uri.parse(
-      'https://api.weatherapi.com/v1/search.json?key=0e85ff7496b64fe08df84436251804&q=$query',
-    );
-
-    try {
-      final res = await http.get(url);
-      if (res.statusCode == 200) {
-        setState(() {
-          _suggestions = jsonDecode(res.body);
-        });
-      }
-    } catch (e) {
-      print('Error fetching suggestions: $e');
-    }
-  }
 
   Future _getLocation() async {
     try {
@@ -149,15 +126,7 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
             ),
-
-            // 🟡 Suggestions Overlay
-            if (_suggestions.isNotEmpty)
-              Positioned(
-                top: 70,
-                left: 16,
-                right: 16,
-                child: _suggestionOverlay(),
-              ),
+ 
           ],
         ),
       ),
@@ -641,49 +610,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _suggestionOverlay() {
-    return Material(
-      color: Colors.transparent,
-      child: Container(
-        decoration: BoxDecoration(
-          color: const Color.fromARGB(255, 30, 50, 70),
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.15),
-              spreadRadius: 1,
-              blurRadius: 6,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: ListView.builder(
-          shrinkWrap: true,
-          itemCount: _suggestions.length,
-          itemBuilder: (context, index) {
-            final loc = _suggestions[index];
-            return ListTile(
-              title: Text(
-                '${loc['name']}, ${loc['region']}, ${loc['country']}',
-                style: const TextStyle(color: Colors.white),
-              ),
-              onTap: () {
-                setState(() {
-                  selectedCity = loc['name'];
-                  _searchController.text = loc['name'];
-                  _suggestions.clear();
-                  lat = 0;
-                  long = 0;
-                });
-                getData();
-              },
-            );
-          },
-        ),
-      ),
-    );
-  }
-
+  
   Widget _searchBar() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.start,

@@ -6,7 +6,6 @@ import './models/weather.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 
-
 class WeatherApp extends StatefulWidget {
   @override
   _WeatherAppState createState() => _WeatherAppState();
@@ -19,18 +18,6 @@ class _WeatherAppState extends State<WeatherApp> {
 
   String hinted = 'Search for a city'; // Default hint text
   double lat = 0, long = 0; // Location coordinates (not used in this code yet)
-
-
-
-
-  Future _getLocation() async {
-    Position position = await Geolocator.getCurrentPosition();
-    setState(() {
-      lat = position.latitude;
-      long = position.longitude;
-    });
-    getData();
-  }
 
 
   // Show modal to add new location
@@ -78,43 +65,6 @@ class _WeatherAppState extends State<WeatherApp> {
   }
 
   // Sliding card for adding a new location
-  Widget _slidingCard() {
-    return GestureDetector(
-      onTap: _showAddLocationModal,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
-        margin: const EdgeInsets.symmetric(vertical: 20),
-        decoration: BoxDecoration(
-          color: Colors.blueAccent,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.3),
-              blurRadius: 10,
-              spreadRadius: 1,
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Icon(
-              Icons.add,
-              color: Colors.white,
-              size: 28,
-            ),
-            const SizedBox(width: 10),
-            Text(
-              'Add New Location',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   // List of added locations
   Widget _addedLocationsList() {
@@ -122,10 +72,14 @@ class _WeatherAppState extends State<WeatherApp> {
       itemCount: addedLocations.length,
       itemBuilder: (context, index) {
         return InkWell(
-          onTap: () => {
-            
-            Navigator.pushNamed(context, "/Cards",arguments: addedLocations[index])
-          },
+          onTap:
+              () => {
+                Navigator.pushNamed(
+                  context,
+                  "/Cards",
+                  arguments: addedLocations[index],
+                ),
+              },
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
             margin: const EdgeInsets.symmetric(vertical: 8),
@@ -142,11 +96,7 @@ class _WeatherAppState extends State<WeatherApp> {
             ),
             child: Row(
               children: [
-                Icon(
-                  Icons.location_on,
-                  color: Colors.white,
-                  size: 24,
-                ),
+                Icon(Icons.location_on, color: Colors.white, size: 24),
                 const SizedBox(width: 10),
                 Text(
                   addedLocations[index],
@@ -154,10 +104,7 @@ class _WeatherAppState extends State<WeatherApp> {
                 ),
                 Spacer(),
                 IconButton(
-                  icon: Icon(
-                    Icons.delete,
-                    color: Colors.white,
-                  ),
+                  icon: Icon(Icons.delete, color: Colors.white),
                   onPressed: () {
                     setState(() {
                       addedLocations.removeAt(index);
@@ -201,22 +148,20 @@ class _WeatherAppState extends State<WeatherApp> {
     }
   }
 
-
   @override
   void initState() {
     super.initState();
-    _getLocation();
+    // _getLocation();
 
     getData();
   }
+
   Weather? list;
 
   getData() async {
     list = await RequestServices().getReq(lat, long, selectedCity);
     if (list != null) {
-      setState(() {
-
-      });
+      setState(() {});
     } else {
       setState(() {
         selectedCity = "";
@@ -253,15 +198,33 @@ class _WeatherAppState extends State<WeatherApp> {
                 style: const TextStyle(color: Colors.white),
               ),
               onTap: () {
-                setState(() {
-                  _searchController.text = loc['name'];
+                if (!addedLocations.contains(loc['name'])) {
+                  setState(() {
+                    _searchController.text = loc['name'];
+                    _suggestions.clear();
+                    lat = 0;
+                    long = 0;
+                    addedLocations.add(loc['name']);
+                    _searchController.clear();
+                  });
+                  getData();
+                  Navigator.pushNamed(
+                    context,
+                    "/Cards",
+                    arguments: loc['name'],
+                  );
+                } else {
                   _suggestions.clear();
                   lat = 0;
                   long = 0;
-                  addedLocations.add(loc['name']);
-                    _searchController.clear();
-                });
-                getData();
+                  _searchController.clear();
+
+                  Navigator.pushNamed(
+                    context,
+                    "/Cards",
+                    arguments: loc['name'],
+                  );
+                }
               },
             );
           },
@@ -294,9 +257,8 @@ class _WeatherAppState extends State<WeatherApp> {
             lat = 0;
             long = 0;
             _suggestions.clear();
-                                addedLocations.add(e);
-                    _searchController.clear();
-
+            addedLocations.add(e);
+            _searchController.clear();
           });
           getData();
         },
@@ -311,22 +273,22 @@ class _WeatherAppState extends State<WeatherApp> {
               children: [
                 InkWell(
                   onTap: () {
-                    _getLocation();
                     _searchController.clear(); // Clear text
                     setState(() {
                       // Force rebuild to show hint
                       _suggestions.clear();
-                      
                     });
                   },
-                  child:  InkWell(
-                    onTap:() => {
-                      Navigator.pushNamed(context, "/Cards")
-                    },
-                    child: Icon(
-                      Icons.pin_drop,
-                      size: 30,
-                      color: Color.fromARGB(90, 0, 0, 0),
+                  child: Tooltip(
+                    message: "Go to your location",
+                    child: InkWell(
+                      onTap: () => {Navigator.pushNamed(context, "/Cards")},
+
+                      child: Icon(
+                        Icons.pin_drop,
+                        size: 30,
+                        color: Color.fromARGB(90, 0, 0, 0),
+                      ),
                     ),
                   ),
                 ),
@@ -351,39 +313,31 @@ class _WeatherAppState extends State<WeatherApp> {
   }
 
   @override
-Widget build(BuildContext context) {
-  return Scaffold(
-    appBar: AppBar(
-      title: Text('Weather App'),
-    ),
-    body: Stack(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _searchBar(),
-              const SizedBox(height: 20),
-              if (_suggestions.isNotEmpty)
-          
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('Weather App')),
+      body: Stack(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _searchBar(),
+                const SizedBox(height: 20),
+                if (_suggestions.isNotEmpty) _suggestionOverlay(),
 
-            _suggestionOverlay(),
-          
-
-              // Display list of added locations or a message
-              addedLocations.isEmpty
-                  ? Expanded(child: Center(child: Text('No locations added')))
-                  : Expanded(child: _addedLocationsList()),
-            ],
+                // Display list of added locations or a message
+                addedLocations.isEmpty
+                    ? Expanded(child: Center(child: Text('No locations added')))
+                    : Expanded(child: _addedLocationsList()),
+              ],
+            ),
           ),
-        ),
 
-        // Suggestion Overlay
-        
-      ],
-    ),
-  );
-}
-
+          // Suggestion Overlay
+        ],
+      ),
+    );
+  }
 }
