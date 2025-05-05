@@ -507,9 +507,9 @@ class _HomePageState extends State<HomePage> {
         ),
         SizedBox(height: 24),
 
-        if (list?.forecast.forecastday.length == 7) ...[
-          for (int i = 1; i < 8; i++) ...[
-            _forecastCard((list!.forecast.forecastday[0].date.day + i) % 7),
+        if (list?.forecast.forecastday.length ==3) ...[
+          for (int i = 1; i <3; i++) ...[
+            _forecastCard((i) ),
             SizedBox(height: 1),
           ],
         ] else
